@@ -1,22 +1,23 @@
-
 import numpy as np
 import pandas as pd
 
-from pettingzoo.utils.env import ParallelEnv
+from glob import glob
 from gymnasium.spaces import Discrete, Box
+from pettingzoo.utils.env import ParallelEnv
+
+from SocialNeuro.envs.cfg.utils import _get_rewards_egoistic, _get_rewards_prosocial
 
 
 class SocialNeuro(ParallelEnv):
     metadata = {"render_mode": ["human"]}
 
-    def __init__(self, render_mode=None):
+    def __init__(self, render_mode=None, cfg_name="social_v0", reward_struct="egoistic"):
         self.render_mode = render_mode
 
-        self.game_init = pd.read_csv("envs/cfg/social_v0_game_initialization.csv")
-        self.game_mechanics = pd.read_csv("envs/cfg/social_v0_game_mechanics.csv")
+        self.game_init = pd.read_csv("SocialNeuro/envs/cfg/" + cfg_name + "_game_initialization.csv")
+        self.game_mechanics = pd.read_csv("SocialNeuro/envs/cfg/" + cfg_name + "_game_mechanics.csv")
 
-        # bug
-        self.num_life_points = 4
+        self.reward_struct = reward_struct
 
         self.action_dict = {0: "wait", 1: "play", 2: "none"}
         self.num_actions = len(self.action_dict)
@@ -89,11 +90,11 @@ class SocialNeuro(ParallelEnv):
                 f"--Previous action of agent 2: {self.action_dict[self.player2_action]}"
             )
 
-    def _get_rewards(self):
-        return {
-            "player1": -1 if self.player1_life_points == 0 else 0,
-            "player2": -1 if self.player2_life_points == 0 else 0,
-        }
+    # def _get_rewards(self):
+    #     return {
+    #         "player1": -1 if self.player1_life_points == 0 else 0,
+    #         "player2": -1 if self.player2_life_points == 0 else 0,
+    #     }
 
     def _set_game_var(self, is_init_val=False):
         if is_init_val:
@@ -138,6 +139,12 @@ class SocialNeuro(ParallelEnv):
 
         self.player1_action = 2
         self.player2_action = 2
+        self.num_life_points = self.game_init.player1_life_points.max()
+
+        if self.reward_struct == "egoistic":
+            self._get_rewards = _get_rewards_egoistic
+        elif self.reward_struct == "prosocial":
+            self._get_rewards = _get_rewards_prosocial
 
         if self.render_mode == "human":
             self.render_text(is_start=True)
@@ -197,7 +204,7 @@ class SocialNeuro(ParallelEnv):
             self.agents = []
             return (
                 self._get_obs(),
-                self._get_rewards(),
+                self._get_rewards(self.player1_life_points > 0, self.player2_life_points > 0),
                 terminations,
                 truncations,
                 infos,
