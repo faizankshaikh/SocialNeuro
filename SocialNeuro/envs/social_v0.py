@@ -79,12 +79,10 @@ class SocialNeuro(ParallelEnv):
         if self.render_mode == "human":
             self.render_text()
 
-    def render_text(self, is_start=False):
+    def render_text(self, is_start=False, is_end=False):
         print(f"--Days left: {self.days_left}")
         print(f"--Current life of agent 1: {self.player1_life_points}")
         print(f"--Current life of agent 2: {self.player2_life_points}")
-        print(f"--Individual Probability of payoff: {self.indiv_prob_payoff}")
-        print(f"--Joint Probability of payoff: {self.coop_prob_payoff}")
 
         if not is_start:
             print(
@@ -94,9 +92,16 @@ class SocialNeuro(ParallelEnv):
                 f"--Previous action of agent 2: {self.action_dict[self.player2_action]}"
             )
 
+        if not is_end:
+            print(f"--Individual Probability of payoff: {self.indiv_prob_payoff}")
+            print(f"--Joint Probability of payoff: {self.joint_prob_payoff}")
+            print(f"--Difference in Probability of payoff from the other weather: {self.diff_prob_payoff}")
+            print(f"--Forest Index: {self.forest_index}")
+            print(f"--Weather Index: {self.weather_index}")
+
     def _set_game_var(self, is_init_val=False, new_weather=False):
         if is_init_val:
-            # get days_left, life_points and individual payoffs
+            # get days_left, life_points, individual and joint payoffs
             (
                 _,
                 self.days_left,
@@ -104,43 +109,21 @@ class SocialNeuro(ParallelEnv):
                 self.player2_life_points,
                 _,
                 _,
-                self.weather_type,
+                self.forest_index,
+                self.weather_index,
                 self.indiv_prob_payoff,
+                self.joint_prob_payoff,
+                self.diff_prob_payoff,
+                _,
                 _,
             ) = (
                 self.game_init[
                 (self.game_init.is_init_val == 1)
-                & (self.game_init.player1_action == 1)
-                & (self.game_init.player2_action == 0)
                 ]
                 .sample(1)
                 .values[0]
             )
-
-            # get coop payoffs
-            (
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                self.coop_prob_payoff,
-            ) = (
-                self.game_init[
-                    (self.game_init.days_left == self.days_left)
-                    & (self.game_init.player1_life_points == self.player1_life_points)
-                    & (self.game_init.player2_life_points == self.player2_life_points)
-                    & (self.game_init.player1_action == 1)
-                    & (self.game_init.player2_action == 1)
-                    & (self.game_init.weather_type == self.weather_type)
-                ]
-                .values[0]
-            )
         elif new_weather:
-            # get individual payoffs
             (
                 _,
                 _,
@@ -148,45 +131,30 @@ class SocialNeuro(ParallelEnv):
                 _,
                 _,
                 _,
-                self.weather_type,
+                _,
+                self.weather_index,
                 self.indiv_prob_payoff,
+                self.joint_prob_payoff,
+                self.diff_prob_payoff,
+                _,
                 _,
             ) = (
                 self.game_init[
                 (self.game_init.days_left == self.days_left)
                 & (self.game_init.player1_life_points == self.player1_life_points)
                 & (self.game_init.player2_life_points == self.player2_life_points)
-                & (self.game_init.player1_action == 1)
-                & (self.game_init.player2_action == 0)
+                & (self.game_init.forest_index == self.forest_index)
+                & (self.game_init.weather_index == np.random.choice([0, 1]))
                 ]
                 .sample(1)
                 .values[0]
             )
-
-            # get coop payoffs
-            (
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                _,
-                self.coop_prob_payoff,
-            ) = (
-                self.game_init[
-                    (self.game_init.days_left == self.days_left)
-                    & (self.game_init.player1_life_points == self.player1_life_points)
-                    & (self.game_init.player2_life_points == self.player2_life_points)
-                    & (self.game_init.player1_action == 1)
-                    & (self.game_init.player2_action == 1)
-                    & (self.game_init.weather_type == self.weather_type)
-                ]
-                .values[0]
-            )
         else:
             (
+                _,
+                _,
+                _,
+                _,
                 _,
                 _,
                 _,
@@ -200,9 +168,12 @@ class SocialNeuro(ParallelEnv):
                 self.game_init[
                     (self.game_init.days_left == self.days_left)
                     & (self.game_init.player1_life_points == self.player1_life_points)
-                    & (self.game_init.player1_life_points == self.player1_life_points)
+                    & (self.game_init.player2_life_points == self.player2_life_points)
+                    & (self.game_init.player1_action == self.player1_action)
+                    & (self.game_init.player2_action == self.player2_action)
+                    & (self.game_init.forest_index == self.forest_index)
+                    & (self.game_init.weather_index == self.weather_index)
                 ]
-                .sample(1)
                 .values[0]
             )
 
@@ -262,21 +233,37 @@ class SocialNeuro(ParallelEnv):
         rewards = {a: 0 for a in self.agents}
         terminations = {a: False for a in self.agents}
         truncations = {a: False for a in self.agents}
-        infos = {a: {} for a in self.agents}
+        infos = {
+            "player1": {
+                "prob_payoff": self.player1_prob_payoff
+            },
+            "player2": {
+                "prob_payoff": self.player2_prob_payoff
+            }
+        }
 
         self.days_left -= 1
-
-        if self.render_mode == "human":
-            self.render_text()
+        self._set_game_var(new_weather=True)
 
         if self.days_left == 0 or (
             self.player1_life_points == 0 and self.player2_life_points == 0
         ):
             truncations = {a: True for a in self.agents}
             terminations = {a: False for a in self.agents}
-            infos = {a: {} for a in self.agents}
+            infos = {
+                "player1": {
+                    "prob_payoff": self.player1_prob_payoff
+                },
+                "player2": {
+                    "prob_payoff": self.player2_prob_payoff
+                }
+            }
 
             self.agents = []
+
+            if self.render_mode == "human":
+                self.render_text(is_end=True)
+
             return (
                 self._get_obs(),
                 self._get_rewards(self.player1_life_points > 0, self.player2_life_points > 0),
@@ -285,7 +272,8 @@ class SocialNeuro(ParallelEnv):
                 infos,
             )
 
-        self._set_game_var(new_weather=True)
+        if self.render_mode == "human":
+            self.render_text()
 
         return self._get_obs(), rewards, terminations, truncations, infos
 
