@@ -30,7 +30,7 @@ class SocialNeuro(ParallelEnv):
         self.player2_prob_payoff = 0
 
         self.observation_spaces = {
-            agent: Box(low=0, high=3, shape=(1, 5)) for agent in self.agents
+            agent: Box(low=0, high=3, shape=(1, 6)) for agent in self.agents
         }
 
         self.action_spaces = {
@@ -46,8 +46,9 @@ class SocialNeuro(ParallelEnv):
                             self.days_left,
                             self.player1_life_points,
                             self.player2_life_points,
-                            self.player1_prob_payoff,
-                            self.player2_prob_payoff,
+                            self.indiv_prob_payoff,
+                            self.joint_prob_payoff,
+                            self.diff_prob_payoff
                         ]
                     ]
                 ),
@@ -60,8 +61,9 @@ class SocialNeuro(ParallelEnv):
                             self.days_left,
                             self.player1_life_points,
                             self.player2_life_points,
-                            self.player1_prob_payoff,
-                            self.player2_prob_payoff,
+                            self.indiv_prob_payoff,
+                            self.joint_prob_payoff,
+                            self.diff_prob_payoff
                         ]
                     ]
                 ),
